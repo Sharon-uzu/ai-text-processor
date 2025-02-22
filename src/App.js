@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import "./App.css"; // Import external CSS
+import { FaTelegram } from "react-icons/fa";
 
-const App= () => {
+const App = () => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [translatedMessages, setTranslatedMessages] = useState([]);
-  const [summarizedMessages, setSummarizedMessages] = useState({});
 
   const languageOptions = {
     en: "English",
@@ -22,6 +21,7 @@ const App= () => {
     ar: "Arabic",
   };
 
+  // Function to translate text
   const translateText = async (text, targetLanguage) => {
     try {
       const response = await fetch(
@@ -35,53 +35,42 @@ const App= () => {
     }
   };
 
-  const summarizeText = async (text) => {
-    try {
-        const response = await fetch("https://hf.space/embed/sshleifer/distilbart-cnn-12-6/api/predict/", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                data: [text],
-            }),
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to fetch summary");
-        }
-
-        const data = await response.json();
-        return data.data[0]; 
-    } catch (error) {
-        console.error("Summarization failed:", error);
-        return "Summarization Error.";
-    }
-};
-
+  // Function to handle sending messages
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const newMessage = { text: inputText, language: "English" };
-    setMessages([...messages, newMessage]);
+    // Add English message first
+    const newMessage = { text: inputText, language: "English", isTranslation: false };
+    let updatedMessages = [...messages, newMessage];
+
+    // If selected language is NOT English, translate immediately
+    if (selectedLanguage !== "en") {
+      const translatedText = await translateText(inputText, selectedLanguage);
+      updatedMessages.push({
+        text: translatedText,
+        language: languageOptions[selectedLanguage],
+        isTranslation: true,
+      });
+    }
+
+    setMessages(updatedMessages);
     setInputText("");
   };
 
-  // function for translation
   const handleTranslate = async () => {
     if (messages.length === 0) return;
 
     const lastMessage = messages[messages.length - 1];
     const translatedText = await translateText(lastMessage.text, selectedLanguage);
-    
-    const newTranslatedMessage = { text: translatedText, language: languageOptions[selectedLanguage] };
-    setTranslatedMessages([...translatedMessages, newTranslatedMessage]);
-  };
 
-  // function for summary
-  const handleSummarize = async (index, text) => {
-    const summary = await summarizeText(text);
-    setSummarizedMessages({ ...summarizedMessages, [index]: summary });
+    setMessages((prevMessages) => [
+      ...prevMessages,
+      {
+        text: translatedText,
+        language: languageOptions[selectedLanguage],
+        isTranslation: true,
+      },
+    ]);
   };
 
   return (
@@ -89,18 +78,7 @@ const App= () => {
       <h2 className="chat-header">AI-Powered Text Processor</h2>
       <div className="output-area">
         {messages.map((msg, index) => (
-          <div key={index} className="message user-message">
-            <p>{summarizedMessages[index] || msg.text}</p>
-            <small>{msg.language}</small>
-            {msg.text.split(" ").length > 150 && !summarizedMessages[index] && (
-              <button className="summarize-button" onClick={() => handleSummarize(index, msg.text)}>
-                Summarize
-              </button>
-            )}
-          </div>
-        ))}
-        {translatedMessages.map((msg, index) => (
-          <div key={index} className="message bot-message">
+          <div key={index} className={`message ${msg.isTranslation ? "bot-message" : "user-message"}`}>
             <p>{msg.text}</p>
             <small>{msg.language}</small>
           </div>
@@ -114,7 +92,7 @@ const App= () => {
           placeholder="Type your message..."
           className="input-field"
         />
-        <button onClick={handleSend} className="send-button">Send</button>
+        <FaTelegram onClick={handleSend} className="send-button"/>
       </div>
       <div className="translate-container">
         <select
@@ -123,10 +101,14 @@ const App= () => {
           className="language-select"
         >
           {Object.entries(languageOptions).map(([code, name]) => (
-            <option key={code} value={code}>{name}</option>
+            <option key={code} value={code}>
+              {name}
+            </option>
           ))}
         </select>
-        <button onClick={handleTranslate} className="translate-button">Translate</button>
+        <button onClick={handleTranslate} className="translate-button">
+          Translate
+        </button>
       </div>
     </div>
   );
